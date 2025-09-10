@@ -1,4 +1,3 @@
-import time
 from dataclasses import dataclass
 from gettext import gettext as _
 from typing import Type
@@ -16,6 +15,8 @@ from seedcash.gui.screens.screen import (
 from seedcash.models.settings import Settings
 
 import logging
+
+from seedcash.models.settings_definition import SettingsConstants
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,9 @@ class Destination:
 # Root level Views don't have a sub-module home so they live at the top level here.
 #
 #########################################################################################
+
+
+# First Main Menu View
 class MainMenuView(View):
     LOAD_SEED = ButtonOption("Load seed", SeedCashIconsConstants.LOAD_SEED)
     GENERATE_SEED = ButtonOption("Generate seed", SeedCashIconsConstants.GENERATE_SEED)
@@ -193,10 +197,10 @@ class MainMenuView(View):
     def run(self):
         from seedcash.gui.screens.screen import MainMenuScreen
 
-        if self.controller.storage.seed:
-            from seedcash.views.load_seed_views import SeedOptionsView
+        if self.controller.storage.wallet:
+            from seedcash.views.wallet_views import WalletOptionsView
 
-            return Destination(SeedOptionsView)
+            return Destination(WalletOptionsView)
 
         button_data = [
             self.LOAD_SEED,
@@ -211,9 +215,7 @@ class MainMenuView(View):
         button_data.append("Power Off")
 
         if button_data[selected_menu_num] == self.LOAD_SEED:
-            from seedcash.views.load_seed_views import SeedCashLoadSeedView
-
-            return Destination(SeedCashLoadSeedView)
+            return Destination(SeedCashChooseWordsView)
 
         elif button_data[selected_menu_num] == self.GENERATE_SEED:
             from seedcash.views.generate_seed_views import SeedCashGenerateSeedView
@@ -227,6 +229,98 @@ class MainMenuView(View):
 
         elif button_data[selected_menu_num] == "Power Off":
             return Destination(PowerOffView)
+
+
+# First Load Seed View
+class SeedCashChooseWordsView(View):
+    def __init__(self, is_random_seed: bool = False, is_calc_final_word: bool = False):
+        super().__init__()
+
+        self.buttons_values = self.controller.settings.get_instance().get_value(
+            SettingsConstants.SETTING__CHOOSE_WORDS
+        )
+
+        self.is_slip39 = (
+            SettingsConstants.SEED_PROTOCOL__SLIP39
+            == self.controller.settings.get_instance().get_value(
+                SettingsConstants.SETTING__SEED_PROTOCOL
+            )
+        )
+
+        self.buttons_data = [
+            ButtonOption(f"{num} Words") for num in self.buttons_values
+        ]
+
+        self.is_random_seed = is_random_seed
+        self.is_calc_final_word = is_calc_final_word
+
+    def run(self):
+        from seedcash.gui.screens.screen import SeedCashButtonListWithNav
+
+        selected_menu_num = self.run_screen(
+            SeedCashButtonListWithNav,
+            button_data=self.buttons_data,
+        )
+
+        if selected_menu_num == RET_CODE__BACK_BUTTON:
+            return Destination(BackStackView)
+
+        selected_menu_num = int(self.buttons_values[selected_menu_num])
+        self.controller.storage.set_mnemonic_length(selected_menu_num)
+
+        if self.is_slip39:
+            if self.is_random_seed:
+                from seedcash.views.generate_slip_views import SeedSlipSchemeView
+                from seedcash.models.btc_functions import BitcoinFunctions as bf
+
+                self.bits = bf.get_random_bits_for_slip(
+                    self.controller.storage.mnemonic_length
+                )
+
+                self.controller.storage.set_scheme_params(self.bits)
+
+                return Destination(SeedSlipSchemeView)
+
+            elif self.is_calc_final_word:
+                # If the user wants to calculate the last word of a SLIP39 seed, we set the
+                # mnemonic length.
+                from seedcash.views.generate_slip_views import SeedSlipEntryView
+
+                return Destination(
+                    SeedSlipEntryView,
+                )
+
+            else:
+                # If the user wants to enter a SLIP39 seed, we set the mnemonic length.
+                from seedcash.views.load_slip_views import SeedSlipMnemonicEntryView
+
+                return Destination(
+                    SeedSlipMnemonicEntryView,
+                    view_args={
+                        "cur_word_index": 0,
+                    },
+                )
+        else:
+            if self.is_random_seed:
+                # If the user wants a random seed, we generate it here.
+                from seedcash.views.generate_seed_views import (
+                    SeedCashGenerateSeedRandomView,
+                )
+
+                return Destination(
+                    SeedCashGenerateSeedRandomView,
+                )
+
+            else:
+                from seedcash.views.load_seed_views import SeedMnemonicEntryView
+
+                return Destination(
+                    SeedMnemonicEntryView,
+                    view_args={
+                        "cur_word_index": 0,
+                        "is_calc_final_word": self.is_calc_final_word,
+                    },
+                )
 
 
 class PowerOffView(View):

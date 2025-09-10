@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from typing import Tuple
 from gettext import gettext as _
 
@@ -87,6 +87,7 @@ class Keyboard:
         "font": REGULAR_KEY_FONT,
         "size": 1,
     }
+
     ADDITIONAL_KEYS = {
         KEY_SPACE["code"]: KEY_SPACE,
         KEY_BACKSPACE["code"]: KEY_BACKSPACE,

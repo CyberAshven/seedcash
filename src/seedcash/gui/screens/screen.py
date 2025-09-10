@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Must be huge numbers to avoid conflicting with the selected_button returned by the
 #   screens with buttons.
 RET_CODE__BACK_BUTTON = 1000
-RET_CODE__POWER_BUTTON = 1001
+RET_CODE__CHECK_BUTTON = 1001
 
 
 @dataclass
@@ -213,7 +213,7 @@ class BaseTopNavScreen(BaseScreen):
     title: str = ""
     title_font_size: int = GUIConstants.TOP_NAV_TITLE_FONT_SIZE
     show_back_button: bool = True
-    show_power_button: bool = False
+    show_check_button: bool = False
 
     def __post_init__(self):
         super().__post_init__()
@@ -225,7 +225,7 @@ class BaseTopNavScreen(BaseScreen):
             width=self.canvas_width,
             height=GUIConstants.TOP_NAV_HEIGHT,
             show_back_button=self.show_back_button,
-            show_power_button=self.show_power_button,
+            show_check_button=self.show_check_button,
         )
         self.is_input_in_top_nav = False
 
@@ -233,7 +233,7 @@ class BaseTopNavScreen(BaseScreen):
 
     def _run(self):
         while True:
-            if not self.top_nav.show_back_button and not self.top_nav.show_power_button:
+            if not self.top_nav.show_back_button and not self.top_nav.show_check_button:
                 # There's no navigation away from this screen; nothing to do here
                 time.sleep(0.1)
                 continue
@@ -345,9 +345,17 @@ class ButtonListScreen(BaseScreen):
 
         # Handle cases where button list is too long for screen
         self.has_scroll_arrows = False
-        if button_list_y < GUIConstants.EDGE_PADDING:
+
+        # Check if scrolling is needed - either list starts above edge or extends below screen
+        available_height = (
+            self.canvas_height - button_list_y - GUIConstants.EDGE_PADDING
+        )
+        if (
+            button_list_y < GUIConstants.EDGE_PADDING
+            or button_list_height > available_height
+        ):
             # Force list to start at top and enable scrolling
-            button_list_y = GUIConstants.EDGE_PADDING
+            button_list_y = GUIConstants.TOP_NAV_HEIGHT
             self.has_scroll_arrows = True
 
             # Calculate how many buttons fit on screen before scrolling
@@ -413,14 +421,19 @@ class ButtonListScreen(BaseScreen):
             self.up_arrow_img = Image.new(
                 "RGBA", size=(2 * self.arrow_half_width, 8), color="black"
             )
-            self.up_arrow_img_y = GUIConstants.EDGE_PADDING
+            self.up_arrow_img_y = GUIConstants.TOP_NAV_HEIGHT - 8
+
             arrow_draw = ImageDraw.Draw(self.up_arrow_img)
+
             arrow_draw.line(
-                (self.arrow_half_width, 1, 0, 7), fill=GUIConstants.BUTTON_FONT_COLOR
+                (self.arrow_half_width, 1, 0, 7),
+                fill=GUIConstants.BUTTON_FONT_COLOR,
+                width=3,
             )
             arrow_draw.line(
                 (self.arrow_half_width, 1, 2 * self.arrow_half_width, 7),
                 fill=GUIConstants.BUTTON_FONT_COLOR,
+                width=3,
             )
 
             # Create down arrow image
@@ -430,11 +443,14 @@ class ButtonListScreen(BaseScreen):
             self.down_arrow_img_y = self.canvas_height - 16 + 2
             arrow_draw = ImageDraw.Draw(self.down_arrow_img)
             arrow_draw.line(
-                (self.arrow_half_width, 7, 0, 1), fill=GUIConstants.BUTTON_FONT_COLOR
+                (self.arrow_half_width, 7, 0, 1),
+                fill=GUIConstants.BUTTON_FONT_COLOR,
+                width=3,
             )
             arrow_draw.line(
                 (self.arrow_half_width, 7, 2 * self.arrow_half_width, 1),
                 fill=GUIConstants.BUTTON_FONT_COLOR,
+                width=3,
             )
 
         # Set initial selected button
@@ -472,7 +488,7 @@ class ButtonListScreen(BaseScreen):
 
             # Only render if button is within visible area
             if (
-                button_position_y >= GUIConstants.EDGE_PADDING
+                button_position_y >= GUIConstants.TOP_NAV_HEIGHT
                 and button_position_y < self.down_arrow_img_y
             ):
                 # Hide arrows when reaching list boundaries
@@ -1197,8 +1213,7 @@ class KeyboardScreen(BaseTopNavScreen):
 
                 elif input in HardwareButtonsConstants.KEYS__LEFT_RIGHT_UP_DOWN:
                     # Live joystick movement; haven't locked this new letter in yet.
-                    # Leave current spot blank for now. Only update the active keyboard keys
-                    # when a selection has been locked in (KEY_PRESS) or removed ("del").
+                    # Leave current spot blank for now.
                     pass
 
                 # Render the text entry display and cursor block
@@ -1216,9 +1231,147 @@ class KeyboardScreen(BaseTopNavScreen):
         return False
 
 
+# Main Menu Screen
 @dataclass
 class MainMenuScreen(LargeButtonScreen):
     # Override LargeButtonScreen defaults
     show_back_button: bool = False
-    show_power_button: bool = True
+    show_check_button: bool = True
     button_font_size: int = 16
+
+
+# SeedCashButtonListWithNav is used to load a seed in the Seed Cash flow.
+# Reminder Screen
+@dataclass
+class SeedCashButtonListWithNav(BaseTopNavScreen, ButtonListScreen):
+    def __post_init__(self):
+        self.is_button_text_centered = False
+        self.is_top_nav = True
+        super().__post_init__()
+
+    def _run(self):
+        while True:
+            ret = self._run_callback()
+            if ret is not None:
+                logging.info("Exiting ButtonListScreen due to _run_callback")
+                return ret
+
+            user_input = self.hw_inputs.wait_for(
+                [
+                    HardwareButtonsConstants.KEY_UP,
+                    HardwareButtonsConstants.KEY_DOWN,
+                    HardwareButtonsConstants.KEY_LEFT,
+                    HardwareButtonsConstants.KEY_RIGHT,
+                ]
+                + HardwareButtonsConstants.KEYS__ANYCLICK
+            )
+
+            with self.renderer.lock:
+                if not self.top_nav.is_selected and (
+                    user_input == HardwareButtonsConstants.KEY_LEFT
+                    or (
+                        user_input == HardwareButtonsConstants.KEY_UP
+                        and self.selected_button == 0
+                    )
+                ):
+                    # SHORTCUT to escape long menu screens!
+                    # OR keyed UP from the top of the list.
+                    # Move selection up to top_nav
+                    # Only move navigation up there if there's something to select
+                    if self.top_nav.show_back_button or self.top_nav.show_check_button:
+                        self.buttons[self.selected_button].is_selected = False
+                        self.buttons[self.selected_button].render()
+
+                        self.top_nav.is_selected = True
+                        self.top_nav.render_buttons()
+
+                elif user_input == HardwareButtonsConstants.KEY_UP:
+                    if self.top_nav.is_selected:
+                        # Can't go up any further
+                        pass
+                    else:
+                        cur_selected_button: Button = self.buttons[self.selected_button]
+                        self.selected_button -= 1
+                        next_selected_button: Button = self.buttons[
+                            self.selected_button
+                        ]
+                        cur_selected_button.is_selected = False
+                        next_selected_button.is_selected = True
+                        if (
+                            self.has_scroll_arrows
+                            and next_selected_button.screen_y
+                            - next_selected_button.scroll_y
+                            + next_selected_button.height
+                            < self.top_nav.height
+                        ):
+                            # Selected a Button that's off the top of the screen
+                            frame_scroll = (
+                                cur_selected_button.screen_y
+                                - next_selected_button.screen_y
+                            )
+                            for button in self.buttons:
+                                button.scroll_y -= frame_scroll
+                            self._render_visible_buttons()
+                        else:
+                            cur_selected_button.render()
+                            next_selected_button.render()
+
+                elif user_input == HardwareButtonsConstants.KEY_DOWN or (
+                    self.top_nav.is_selected
+                    and user_input == HardwareButtonsConstants.KEY_RIGHT
+                ):
+                    if self.selected_button == len(self.buttons) - 1:
+                        # Already at the bottom of the list. Nowhere to go. But may need
+                        # to re-render if we're returning from top_nav; otherwise skip
+                        # this update loop.
+                        if not self.top_nav.is_selected:
+                            continue
+
+                    if self.top_nav.is_selected:
+                        self.top_nav.is_selected = False
+                        self.top_nav.render_buttons()
+
+                        cur_selected_button = None
+                        next_selected_button = self.buttons[self.selected_button]
+                        next_selected_button.is_selected = True
+
+                    else:
+                        cur_selected_button: Button = self.buttons[self.selected_button]
+                        self.selected_button += 1
+                        next_selected_button: Button = self.buttons[
+                            self.selected_button
+                        ]
+                        cur_selected_button.is_selected = False
+                        next_selected_button.is_selected = True
+
+                    if self.has_scroll_arrows and (
+                        next_selected_button.screen_y
+                        - next_selected_button.scroll_y
+                        + next_selected_button.height
+                        > self.down_arrow_img_y
+                    ):
+                        # Selected a Button that's off the bottom of the screen
+                        frame_scroll = (
+                            next_selected_button.screen_y - cur_selected_button.screen_y
+                        )
+                        for button in self.buttons:
+                            button.scroll_y += frame_scroll
+                        self._render_visible_buttons()
+                    else:
+                        if cur_selected_button:
+                            cur_selected_button.render()
+                        next_selected_button.render()
+
+                elif user_input in HardwareButtonsConstants.KEYS__ANYCLICK:
+                    if self.top_nav.is_selected:
+                        if self.top_nav.show_check_button:
+                            if self.top_nav.right_button.is_selected:
+                                return RET_CODE__CHECK_BUTTON
+                        if self.top_nav.show_back_button:
+                            if self.top_nav.left_button.is_selected:
+                                return RET_CODE__BACK_BUTTON
+
+                    return self.selected_button
+
+                # Write the screen updates
+                self.renderer.show_image()

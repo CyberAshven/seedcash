@@ -6,13 +6,14 @@ from PIL.Image import Image
 
 from seedcash.gui.toast import BaseToastOverlayManagerThread
 from seedcash.models.seed import Seed
-from seedcash.models.seed_storage import SeedStorage
+from seedcash.models.storage import SeedStorage
 from seedcash.models.settings import Settings
+from seedcash.models.settings_definition import SettingsConstants
 from seedcash.models.singleton import Singleton
 from seedcash.models.threads import BaseThread
 from seedcash.views.screensaver import ScreensaverScreen
 from seedcash.hardware.buttons import HardwareButtons
-from seedcash.views.view import Destination, PowerOffView
+from seedcash.views.view import Destination
 
 
 logger = logging.getLogger(__name__)
@@ -63,8 +64,8 @@ class BackgroundImportThread(BaseThread):
 
         # # Do costly initializations
         time_import("seedcash.models.btc_functions")
-        time_import("seedcash.models.seed_storage")
-        from seedcash.models.seed_storage import SeedStorage
+        time_import("seedcash.models.storage")
+        from seedcash.models.storage import SeedStorage
 
         Controller.get_instance()._storage = SeedStorage()
 
@@ -72,6 +73,8 @@ class BackgroundImportThread(BaseThread):
 
         time_import("seedcash.views.load_seed_views")
         time_import("seedcash.views.generate_seed_views")
+        time_import("seedcash.views.load_slip_views")
+        time_import("seedcash.views.generate_slip_views")
 
 
 class Controller(Singleton):
@@ -201,8 +204,8 @@ class Controller(Singleton):
                 f"There is no seed_num {seed_num}; only {len(self.storage.seeds)} in memory."
             )
 
-    def discard_seed(self):
-        self.storage.seed = None
+    def discard_wallet(self):
+        self.storage.wallet = None
 
     def pop_prev_from_back_stack(self):
         if len(self.back_stack) > 0:
@@ -358,6 +361,26 @@ class Controller(Singleton):
     @property
     def is_screensaver_running(self):
         return self.screensaver is not None and self.screensaver.is_running
+
+    # switch seed protocols
+    def switch_seed_protocol(self, protocol: str) -> Destination:
+        """
+        Switches the seed protocol to the given protocol and returns a Destination to
+        the ProtocolMigrationWarningView if needed.
+        """
+        logger.info(f"Switching seed protocol to: {protocol}")
+        if protocol not in SettingsConstants.get_all_seed_protocols():
+            raise ValueError(f"Invalid seed protocol: {protocol}")
+
+        self.settings.set_value(SettingsConstants.SETTING__SEED_PROTOCOL, protocol)
+
+        self.ChooseWords = SettingsConstants.get_choose_words_options(protocol)
+        logger.info(f"Choose words options set to: {self.ChooseWords}")
+        # set the choose words
+        self.settings.set_value(
+            SettingsConstants.SETTING__CHOOSE_WORDS,
+            self.ChooseWords,
+        )
 
     def start_screensaver(self):
         # If a toast is running, tell it to give up the Renderer.lock; it will then

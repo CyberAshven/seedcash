@@ -2,14 +2,15 @@ import logging
 
 from gettext import gettext as _
 from seedcash.models.btc_functions import BitcoinFunctions as bf
-from seedcash.gui.components import SeedCashIconsConstants
 from seedcash.gui.screens import RET_CODE__BACK_BUTTON
 from seedcash.gui.screens.screen import ButtonOption
-from seedcash.models.seed import Seed
+from seedcash.models.settings import Settings
+from seedcash.models.settings_definition import SettingsConstants
 from seedcash.views.view import (
     View,
     Destination,
     BackStackView,
+    SeedCashChooseWordsView,
 )
 
 
@@ -22,8 +23,20 @@ Seed Cash Updated Code
 
 # First Generate Seed View
 class SeedCashGenerateSeedView(View):
-    RANDOM_SEED = ButtonOption("Random Seed")
-    CALCULATE_SEED = ButtonOption("Calculate Last Word")
+    def __init__(self):
+        super().__init__()
+        self.RANDOM_SEED = ButtonOption("Random Seed")
+
+        self.CALCULATE_SEED = ButtonOption(
+            "Calculate Last Word"
+            if (
+                Settings.get_instance().get_value(
+                    SettingsConstants.SETTING__SEED_PROTOCOL
+                )
+                == SettingsConstants.SEED_PROTOCOL__BIP39
+            )
+            else "Custom Entropy Seed"
+        )
 
     def run(self):
         from seedcash.gui.screens.generate_seed_screens import (
@@ -41,16 +54,12 @@ class SeedCashGenerateSeedView(View):
             return Destination(BackStackView)
 
         if button_data[selected_menu_num] == self.CALCULATE_SEED:
-            from seedcash.views.load_seed_views import SeedCashLoadSeedView
-
             return Destination(
-                SeedCashLoadSeedView, view_args=dict(is_calc_final_word=True)
+                SeedCashChooseWordsView, view_args=dict(is_calc_final_word=True)
             )
         elif button_data[selected_menu_num] == self.RANDOM_SEED:
-            from seedcash.views.load_seed_views import SeedCashLoadSeedView
-
             return Destination(
-                SeedCashLoadSeedView, view_args=dict(is_random_seed=True)
+                SeedCashChooseWordsView, view_args=dict(is_random_seed=True)
             )
 
         return Destination(BackStackView)
@@ -59,13 +68,13 @@ class SeedCashGenerateSeedView(View):
 class SeedCashGenerateSeedRandomView(View):
     """View to generate a random seed and display the words."""
 
-    def __init__(self, num_words: int = 12):
+    def __init__(self):
         super().__init__()
-        self.num_words = num_words
 
     def run(self):
         # Generate a random mnemonic
-        mnemonic = bf.generate_random_seed(num_words=self.num_words)
+        num_words = self.controller.storage.mnemonic_length
+        mnemonic = bf.generate_random_seed(num_words=num_words)
         from seedcash.views.generate_seed_views import ShowWordsView
 
         return Destination(ShowWordsView, view_args={"mnemonic": mnemonic})
@@ -90,11 +99,12 @@ class ShowWordsView(View):
         if confirm == RET_CODE__BACK_BUTTON:
             return Destination(BackStackView)
         elif confirm == "CONFIRM":
-            from seedcash.views.load_seed_views import SeedFinalizeView
+            from seedcash.views.wallet_views import WalletFinalizeView
 
+            self.controller.storage.convert_mnemonic_to_seed()
             return Destination(
-                SeedFinalizeView,
-                view_args={"seed": self.controller.storage.get_generated_seed()},
+                WalletFinalizeView,
+                view_args={"wallet": self.controller.storage.get_seed_wallet()},
             )
 
 
@@ -125,7 +135,7 @@ class ToolsCalcFinalWordShowFinalWordView(View):
     def __init__(self, last_bits: str = None):
         super().__init__()
 
-        wordlist = Seed.get_wordlist()
+        wordlist = self.controller.storage.get_wordlist
         # Prep the user's selected word / coin flips and the actual final word for
         # the display.
 
@@ -179,7 +189,7 @@ class ToolsCalcFinalWordDoneView(View):
         )
 
         final_word = self.controller.storage.get_mnemonic_word(-1)
-        generated_seed = self.controller.storage.get_generated_seed()
+        generated_seed = self.controller.storage.get_seed_wallet()
 
         button_data = [self.FINISH, self.PASSPHRASE]
 
@@ -197,12 +207,12 @@ class ToolsCalcFinalWordDoneView(View):
 
             # Discard the mnemonic and seed after generating the final word
             self.controller.storage.discard_mnemonic()
-            self.controller.discard_seed()
+            self.controller.storage.discard_seed()
 
             return Destination(MainMenuView)
 
         elif button_data[selected_menu_num] == self.PASSPHRASE:
-            from seedcash.views.load_seed_views import SeedAddPassphraseView
+            from seedcash.views.wallet_views import SeedAddPassphraseView
 
             return Destination(
                 SeedAddPassphraseView, view_args={"seed": generated_seed}

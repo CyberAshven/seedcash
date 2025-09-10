@@ -166,8 +166,8 @@ class ToolsCoinFlipEntryScreen(KeyboardScreen):
         # TRANSLATOR_NOTE: current coin-flip number vs total flips (e.g. flip 3 of 4)
         self.show_back_button = False
         # Specify the keys in the keyboard
-        self.rows = 1
-        self.cols = 4
+        self.rows = 2
+        self.cols = 3
         self.key_height = (
             GUIConstants.TOP_NAV_TITLE_FONT_SIZE + 2 + 2 * GUIConstants.EDGE_PADDING
         )
@@ -200,9 +200,7 @@ class ToolsCalcFinalWordScreen(ButtonListScreen):
         text_y = GUIConstants.TOP_NAV_HEIGHT
 
         your_input = TextArea(
-            text="Your input: {} {}".format(
-                self.selected_final_bits, "- " * self.num_checksum_bits
-            ),
+            text="Your input: {}".format(self.selected_final_bits),
             screen_x=text_x,
             screen_y=text_y,
         )
