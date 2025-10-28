@@ -1,75 +1,42 @@
-# SeedCash 🔐
+# SeedCash 
 
-**A Secure Bitcoin Cash Seed Management Tool**
+## Features
 
-SeedCash is a Python-based seed management solution designed for secure Bitcoin Cash seed phrase generation, storage, and management. The project supports both BIP-39 and SLIP-39 seed standards, providing multiple layers of security for Bitcoin Cash users.
+### Security Features
 
-![Bitcoin Cash](https://img.shields.io/badge/Bitcoin%20Cash-0AC18E?style=for-the-badge&logo=bitcoin-cash&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Security](https://img.shields.io/badge/Security-BIP39%20%7C%20SLIP39-red?style=for-the-badge)
 
-## ✨ Features
-
-### 🔑 Seed Management
-
-- **BIP-39 Support**: Generate and manage standard 12/24 word mnemonic phrases
-- **SLIP-39 Support**: Advanced Shamir's Secret Sharing implementation (v1.1.0+)
-- **Multiple Languages**: Support for various BIP-39 wordlists
-- **Secure Generation**: Cryptographically secure entropy sources
-
-### 🖥️ User Interface
-
-- **Intuitive GUI**: Easy-to-use graphical interface
-- **QR Code Support**: Generate and scan QR codes for seed backup
-- **Virtual Keyboard**: Secure input with on-screen keyboard
-- **Touch-Friendly**: Optimized for touchscreen devices
-
-### 🛡️ Security Features
-
-- **Air-Gapped Operation**: Works offline for maximum security
-- **Encryption**: Multiple storage encryption options
-- **Secure Display**: Protected rendering of sensitive information
-- **Validation**: Comprehensive seed phrase verification
-
-### 💾 Storage Options
-
-- **Local Storage**: Encrypted local file storage
-- **SD Card Support**: External storage capabilities
-- **Backup & Recovery**: Multiple backup formats
-- **Import/Export**: Flexible data management
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 src/
-├── main.py                     # Application entry point
+├── main.py                   
 └── seedcash/
-    ├── controller.py           # Main application controller
-    ├── gui/                    # User interface components
-    │   ├── components.py       # UI building blocks
-    │   ├── keyboard.py         # Virtual keyboard
-    │   ├── renderer.py         # Display rendering
-    │   ├── toast.py           # Notifications
-    │   └── screens/           # Application screens
-    ├── hardware/              # Hardware abstraction
-    │   ├── buttons.py         # Input handling
-    │   ├── camera.py          # QR scanner
-    │   ├── microsd.py         # Storage operations
-    │   └── displays/          # Display drivers
-    ├── models/                # Core logic
-    │   ├── btc_functions.py   # Bitcoin Cash utilities
-    │   ├── seed.py            # Seed management
-    │   ├── wallet.py          # Wallet operations
-    │   ├── scheme.py          # Cryptographic schemes
-    │   └── settings.py        # Configuration
-    ├── helper/                # Utilities (v1.1.0+)
-    │   └── shamir_mnemonic/   # SLIP-39 implementation
-    ├── resources/             # Assets
-    │   ├── fonts/             # UI fonts
-    │   ├── img/               # Images and icons
-    │   ├── bip39.txt          # BIP-39 wordlist
-    │   └── slip39.txt         # SLIP-39 wordlist
-    └── views/                 # Application views
+    ├── controller.py          
+    ├── gui/                    
+    │   ├── components.py      
+    │   ├── keyboard.py       
+    │   ├── renderer.py        
+    │   ├── toast.py           
+    │   └── screens/           
+    ├── hardware/              
+    │   ├── buttons.py         
+    │   ├── camera.py         
+    │   ├── microsd.py        
+    │   └── displays/          
+    ├── models/                
+    │   ├── btc_functions.py   
+    │   ├── seed.py           
+    │   ├── wallet.py         
+    │   ├── scheme.py         
+    │   └── settings.py       
+    ├── helper/               
+    │   └── shamir_mnemonic/  
+    ├── resources/          
+    │   ├── fonts/            
+    │   ├── img/            
+    │   ├── bip39.txt       
+    │   └── slip39.txt       
+    └── views/                
         ├── generate_seed_views.py
         ├── load_seed_views.py
         ├── wallet_views.py
