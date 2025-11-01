@@ -22,7 +22,15 @@ SeedCash implements multiple layers of security:
   - **BIP-39**: 18 words  
   - **BIP-39**: 21 words  
   - **BIP-39**: 24 words
-    
+  - **SLIP-39**: 20 words  
+  - **SLIP-39**: 33 words
+
+- **Load Seed**: Securely introduce private keys.   
+  - **BIP-39**: 12 words  
+  - **BIP-39**: 15 words  
+  - **BIP-39**: 18 words  
+  - **BIP-39**: 21 words  
+  - **BIP-39**: 24 words
   - **SLIP-39**: 20 words  
   - **SLIP-39**: 33 words
 
