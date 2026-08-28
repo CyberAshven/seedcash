@@ -25,6 +25,7 @@ PSBT_GLOBAL_PROPRIETARY      = 0xFC
 PSBT_IN_NON_WITNESS_UTXO     = 0x00
 PSBT_IN_WITNESS_UTXO         = 0x01
 PSBT_IN_PARTIAL_SIG          = 0x02
+PSBT_IN_SIGHASH_TYPE         = 0x03
 PSBT_IN_REDEEM_SCRIPT        = 0x04
 PSBT_IN_WITNESS_SCRIPT       = 0x05
 PSBT_IN_BIP32_DERIVATION     = 0x06
@@ -258,6 +259,10 @@ class BitcoinCashSigner:
     # Main signing method – rebuilds the PSBT from parsed maps
     # ------------------------------------------------------------------
     def signed_psbt(self) -> bytearray:
+        """Rebuild and sign the PSBT.
+
+        Honors PSBT_IN_SIGHASH_TYPE (key 0x03) when present; otherwise 0x41.
+        """
         parsed = self.parser.parsed
         tx_bytes = parsed["unsigned_tx"]
         if tx_bytes is None:
@@ -314,10 +319,23 @@ class BitcoinCashSigner:
                 print("  already signed by this pubkey, skipping")
                 continue
 
+            # Honor PSBT_IN_SIGHASH_TYPE when present; default 0x41.
+            hash_type = SIGHASH_BCH
+            for key, value in input_pairs:
+                if key[0] == PSBT_IN_SIGHASH_TYPE:
+                    if len(value) != 4:
+                        raise ValueError("PSBT_IN_SIGHASH_TYPE must be 4 bytes")
+                    hash_type = int.from_bytes(value, "little")
+                    break
+            if not hash_type & SIGHASH_FORKID:
+                raise ValueError(
+                    f"sighash type 0x{hash_type:02x} does not set FORKID (0x40)"
+                )
+
             # Sign
             amount = tx_input.spent_output.value_satoshis
-            sighash = self._create_sighash(tx_bytes, idx, script_code, amount, SIGHASH_BCH)
-            sig = self._sign_schnorr(priv, sighash, pub) + bytes([SIGHASH_BCH])
+            sighash = self._create_sighash(tx_bytes, idx, script_code, amount, hash_type)
+            sig = self._sign_schnorr(priv, sighash, pub) + bytes([hash_type & 0xFF])
 
             # Update the input map (keep all existing pairs, add partial signature)
             updated_pairs = input_pairs.copy()
